@@ -1,0 +1,91 @@
+# Program to download latest lane order Google Sheet, scrape the latest order, then upload the new order
+# Written by Matt Cadel (09/01/23)
+# All client identifying informaiton has been removed.
+
+# Import packages
+from selenium import webdriver
+from bs4 import BeautifulSoup
+import pandas as pd
+import datetime
+from datetime import date
+from gspread_dataframe import set_with_dataframe
+import time
+from selenium.webdriver.common.by import By
+import gspread
+
+# Import latet lane order
+gc = gspread.service_account(filename='/Users/mattcadel/Documents/Python/DSML/venv/lib/python3.10/site-packages/gspread/service_account.json')
+
+
+prep = gc.open("_____ - Lane Order Tracker - Lane Order").worksheet("_____ - Lane Order Tracker - Lane Order") 
+lane_order = pd.DataFrame(prep.get_all_records())
+print(lane_order)
+
+latest_change = pd.read_csv('/Users/mattcadel/Documents/Python/Work_Projects/_____/_____ - Lane Order Tracker - Latest Change.csv')
+
+# Processing existing sheet and setting today's date
+lane_order.Date = pd.to_datetime(lane_order.Date)
+today = date.today() 
+yesterday = today - datetime.timedelta(days=1)
+print(yesterday)
+
+# Scraping latest lane order
+
+______email = 'matt.cadel@24i.com'
+______password = 'whu93PHpji%B?vk'
+
+if lane_order.Date.max() < today:
+    fixed_rails = pd.DataFrame(data = {'Page': ['Home', 'Home'], 'Lane Name': ['Brand Promo', 'Featured'], 'Position': [1, 2], 'Date': [today, today], 'Text Format': ["'1'", "'2'"]})
+    lane_order = pd.concat([fixed_rails, lane_order])
+
+    URL = 'https://_____.co.uk/account/login'
+    driver = webdriver.Chrome(executable_path='/Users/mattcadel/Documents/Python/Chrome Driver/chromedriver')
+    driver.get(URL)
+    time.sleep(1)
+
+    email = driver.find_element(By.ID, 'email')
+    email.clear()
+    email.send_keys(______email)
+    password = driver.find_element(By.ID, 'password')
+    password.clear()
+    password.send_keys(______password)
+
+    login_attempt = driver.find_element(By.ID, 'sign-in-btn')
+    login_attempt.click()   
+
+    time.sleep(10)
+
+    soup = BeautifulSoup(driver.page_source)
+
+    position_list = []
+    lane_list = []
+    page_list = []
+    date_list = []
+    text_format_list = []
+
+    for i in range(3,14):
+        position_list.append(i)
+        page_list.append('Home')
+        date_list.append(today)
+        text_format_list.append("'"+str(i)+"'")
+        lane = soup.find(id="collection-title-rp-"+str(i)).get_text()
+        print(lane.replace(" ", ""))
+        lane_list.append(lane.replace(" ", "")[:-1])
+    
+    variable_rails = pd.DataFrame(data = {'Page': page_list, 'Lane Name': lane_list, 'Position': position_list, 'Date': date_list, 'Text Format': text_format_list})
+    print(position_list)
+    print(lane_list)
+    # lane_order = pd.concat([variable_rails, lane_order])
+    
+    # print(lane_order)
+
+
+# Update existing to google sheet
+
+prep.clear()
+set_with_dataframe(worksheet=prep, dataframe=lane_order, include_index=False, include_column_header=True, resize=True)
+
+today_order = lane_order.loc[lane_order['Date'] == today]
+print(today_order)
+
+gc.append_row(lane_order, table_range="A1:H1") 
